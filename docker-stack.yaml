@@ -1,0 +1,100 @@
+version: "3.4"
+services: 
+  mysql: 
+    build: 
+      context: "."
+      dockerfile: mysql.Dockerfile
+    environment: 
+      - MYSQL_ROOT_PASSWORD=XMN347
+      - MYSQL_DATABASE=dbkuasai
+      - MYSQL_USER=cilsykuasaiuser
+      - MYSQL_PASSWORD=cilsykuasaipassword
+    image: wingky/mysql-custom:latest
+    networks: 
+      - int_net
+    volumes: 
+      - "db-data:/var/lib/mysql"
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 2
+        delay: 10s
+      restart_policy: 
+        condition: on-failure
+    healthcheck:
+      test: ["CMD", "service","mysql","status"]
+
+
+  pma: 
+    build: 
+      context: "."
+      dockerfile: pma.Dockerfile
+    environment: 
+      - PMA_HOST=mysql
+    image: wingky/pma-custom:latest
+    networks: 
+      - int_net
+      - proxy_net
+    deploy:
+      replicas: 1
+      update_config : 
+        parallelism: 2
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+    healthcheck:
+      test: curl -f http://localhost/ || exit 1 
+
+
+  proxy: 
+    build: 
+      context: "."
+      dockerfile: proxy.Dockerfile
+    image: wingky/proxy-custom:latest
+    networks: 
+      - proxy_net
+      - ext_net
+    volumes:
+      - "proxy:/etc/nginx/conf.d/"
+    ports: 
+      - "80:80"
+    deploy:
+      replicas: 3
+      update_config : 
+        parallelism: 2 
+        delay: 10s
+      restart_policy: 
+        condition: on-failure
+    healthcheck:
+      test: ["CMD", "service", "nginx", "status"]
+
+  web: 
+    build: 
+      context: "."
+      dockerfile: webserver.Dockerfile
+    image: wingky/web-custom:latest
+    networks: 
+      - proxy_net
+      - int_net
+    volumes: 
+      - "web:/var/www/html/"
+    deploy:
+      replicas: 3
+      update_config : 
+        parallelism: 2
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+    healthcheck:
+      test: ["CMD", "service", "apache2", "status"]
+
+
+networks:
+  int_net:
+  proxy_net:
+  ext_net:
+
+volumes:
+  web:
+  db-data:
+  proxy:
